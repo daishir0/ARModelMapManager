@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\File;
-use App\Jisseki;
 
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as XlsxReader;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use App\Models\ArModel;
-
 
 class FileController extends Controller
 {
@@ -57,7 +55,7 @@ class FileController extends Controller
 
     //upload/{id}
     //アップロード済みのエクセルファイルを files より読み出し、
-    //実績を解析、jissekisテーブルに格納する
+    //Moldelsを解析、Moldelsテーブルに格納する
     public function extract($fid)
     {
         $fileitem = File::find($fid);
@@ -71,7 +69,7 @@ class FileController extends Controller
             return redirect(route('file.upload'))->with('msg_error', $fid . ' 「' . $filename . '」このレコードは取込済みです。');
         }
 
-        //実績へ反映処理
+        //Moldelsへ反映処理
         
         //エクセルファイルの内容
         $data = $fileitem->file;
@@ -105,7 +103,7 @@ class FileController extends Controller
         $c_ng = 0; //反映NGの行数
         foreach ($sheet->getRowIterator() as $row) {
             $r_idx = $row->getRowIndex();
-            $raw = $sheet->rangeToArray("A".$r_idx.":H".$r_idx);
+            $raw = $sheet->rangeToArray("A".$r_idx.":I".$r_idx);
             $new_data = $raw[0]; //row側要素1　の　2次元配列　を1次元配列に変換
 
             if ($f_title) {
@@ -115,7 +113,7 @@ class FileController extends Controller
             }
 
             //エラー表示
-            $str_tmp .= $r_idx . "行は";
+            $str_tmp .= $r_idx . "行目に";
 
             //入力チェック
             $chk_rslt = self::check_input($new_data);
@@ -129,10 +127,10 @@ class FileController extends Controller
                 $c_ng++;
                 $str_tmp .= "空白要素あり, \n";
                 continue;
-            } else if ($chk_rslt == self::CHK_DATE_NG) {
-                $c_ng++;
-                $str_tmp .= "日付変換NG, \n";
-                continue;
+            // } else if ($chk_rslt == self::CHK_DATE_NG) {
+            //     $c_ng++;
+            //     $str_tmp .= "日付変換NG, \n";
+            //     continue;
             }
 
             //この先 CHK_FULL か CHK_EMP
@@ -143,7 +141,7 @@ class FileController extends Controller
                 $item = null;
             } else {
                 $id = intval($new_data[0]);
-                $item = Jisseki::find($id);
+                $item = ArModel::find($id);
                 $str_tmp .= "id" . $id . " ";
             }
 
@@ -154,7 +152,7 @@ class FileController extends Controller
                     //id空白でもidを指定する。
                     //$idを指定しないとauto inc機能が働くが、id指定で新規追加した分は考慮されなくて
                     //idが衝突してしまうため
-                    $max_id = Jisseki::max('id');
+                    $max_id = ArModel::max('id');
                     $id = $max_id + 1;
                     if (self::access_jisseki('add', $new_data, null, $id)) { $c_ok++; } else { $c_ng++; }
                 } else if (is_null($item)) {
@@ -189,9 +187,9 @@ class FileController extends Controller
         //更新フラグ
         if ($c_ng == 0) {
             $fileitem->update(['del_flg' => 1]);
-            return redirect(route('file.upload'))->with('msg_success', $fid . ' 「' . $filename . '」実績工数、取り込み完了 ');
+            return redirect(route('file.upload'))->with('msg_success', ' 「' . $filename . '」取り込み完了 ');
         } else {
-            return redirect(route('file.upload'))->with('msg_error', $fid . ' 「' . $filename . '」エラー発生あり(' . $c_ng . '個) ' . $str_tmp);
+            return redirect(route('file.upload'))->with('msg_error', ' 「' . $filename . '」取り込みエラー発生(' . $c_ng . '個) ' . $str_tmp);
         }
 
     }
@@ -201,32 +199,33 @@ class FileController extends Controller
     // 戻り値：self::CHK_xxx で始まる定数
     private static function check_input($new_data)
     {
-        if (count($new_data) != 8) {
-            //8列を想定
+        if (count($new_data) != 9) {
+            //9列を想定
             return self::CHK_CNT_NG;
         }
 
         $c_null = 0;
         // $new_data[0]はid チェックしない
-        for ($i=1; $i<8;$i++) {
+        for ($i=1; $i<9;$i++) {
             if ($new_data[$i] === null) {
                 $c_null++;
             }
         }
         if ($c_null == 0) {
-            $date = Jisseki::todate($new_data[4]);
-            if ($date == false) {
-                //日付の変換出来ず
-                return self::CHK_DATE_NG;
-            }
+            // $date = ArModel::todate($new_data[4]);
+            // if ($date == false) {
+            //     //日付の変換出来ず
+            //     return self::CHK_DATE_NG;
+            // }
             //すべてありで問題なし
             return self::CHK_FULL;
-        } else if ($c_null == 7) {
+        } else if ($c_null == 8) {
             //すべてなしで問題なし
             return self::CHK_EMP;
         } else {
             //中途半端で問題あり
-            return self::CHK_HAS_EMP;
+            //空白ありだが、OKとして処理
+            return self::CHK_FULL;
         }
     }
 
@@ -236,13 +235,14 @@ class FileController extends Controller
     private static function check_modified($new_data, $item)
     {
         $c_diff = 0;
-        if ($item->project != $new_data[1]) { $c_diff++; }
-        if ($item->function != $new_data[2]) { $c_diff++; }
-        if ($item->output != $new_data[3]) { $c_diff++; }
-        if ($item->date != Jisseki::todate($new_data[4])) { $c_diff++; }
-        if ($item->hour != floatval($new_data[5])) { $c_diff++; }
-        if ($item->user != $new_data[6]) { $c_diff++; }
-        if ($item->comments != $new_data[7]) { $c_diff++; }
+        if ($item->title != $new_data[1]) { $c_diff++; }
+        if ($item->latitude != floatval($new_data[2])) { $c_diff++; }
+        if ($item->longitude != floatval($new_data[3])) { $c_diff++; }
+        if ($item->altitude != floatval($new_data[4])) { $c_diff++; }
+        if ($item->url != $new_data[5]) { $c_diff++; }
+        if ($item->options != $new_data[6]) { $c_diff++; }
+        if ($item->filename != $new_data[7]) { $c_diff++; }
+        if ($item->kinds != $new_data[8]) { $c_diff++; }
         // if ($c_diff>0) dd($c_diff, $item, $new_data);
         return ($c_diff != 0);
     }
@@ -253,13 +253,15 @@ class FileController extends Controller
     private static function make_attr($new_data = null)
     {
         $attr = [];
-        $attr['project'] = $new_data[1];
-        $attr['function'] = $new_data[2];
-        $attr['output'] = $new_data[3];
-        $attr['date'] = Jisseki::todate($new_data[4]);
-        $attr['hour'] = floatval($new_data[5]);
-        $attr['user'] = $new_data[6];
-        $attr['comments'] = $new_data[7];
+        $attr['title'] = $new_data[1] == null ? 'no title' : $new_data[1];
+        $attr['latitude'] = floatval($new_data[2]);
+        $attr['longitude'] = floatval($new_data[3]);
+        $attr['altitude'] = floatval($new_data[4]);
+        $attr['url'] = $new_data[5] == null ? '' : $new_data[5];
+//        $attr['options'] = $new_data[6];
+        $attr['options'] = $new_data[6] == null ? '' : $new_data[6];
+        $attr['filename'] = $new_data[7] == null ? '' : $new_data[7];
+        $attr['kinds'] = $new_data[8] == null ? 'text' : $new_data[8];
         return $attr;
     }
 
@@ -277,7 +279,7 @@ class FileController extends Controller
                 $attr['id'] = $id; // id付き新規作成
             }
             if ($kind == 'add') {
-                $ret = Jisseki::create($attr); //$retは作成されたobj
+                $ret = ArModel::create($attr); //$retは作成されたobj
                 if ($ret !== null) { return true; } else { return false; }
             } else {
                 //変更
@@ -297,7 +299,7 @@ class FileController extends Controller
         return false;
     }
 
-    //実績をダウンロード
+    //Modelsをダウンロード
     public function download()
     {
         $items = ArModel::orderBy('id')->get();
@@ -310,38 +312,37 @@ class FileController extends Controller
         $sheet = $book->getActiveSheet();
 
         $toexcel = []; //エクセルに出力する全データ
-        $row = ['id', 'project', 'function', 'output', 'date', 'hour', 'user', 'comments'];//ヘッダ行
+        //$row = ['id', 'project', 'function', 'output', 'date', 'hour', 'user', 'comments'];//ヘッダ行
+        $row = ['id', 'title', 'latitude', 'longitude', 'altitude', 'url', 'options', 'filename', 'kinds'];//ヘッダ行
         $toexcel[] = $row;
         foreach ($items as $item) {
             $row = []; //1行分のデータ
             $row[] = $item->id;
-            $row[] = $item->project;
-            $row[] = $item->function;
-            $row[] = $item->output;
-            $row[] = Jisseki::format($item->date);
-            $row[] = $item->hour;
-            $row[] = $item->user;
-            $row[] = $item->comments;
+            $row[] = $item->title;
+            $row[] = $item->latitude;
+            $row[] = $item->longitude;
+            $row[] = $item->altitude;
+            $row[] = $item->url;
+            $row[] = $item->options;
+            $row[] = $item->filename;
+            $row[] = $item->kinds;
             $toexcel[] = $row;
         }
         $sheet->fromArray($toexcel, null, 'A1'); //挿入
         
         $sheet->getColumnDimension('A')->setWidth(6);
-        $sheet->getColumnDimension('B')->setWidth(20);
-        $sheet->getColumnDimension('C')->setWidth(20);
-        $sheet->getColumnDimension('D')->setWidth(20);
-        $sheet->getColumnDimension('E')->setWidth(12);
-        $sheet->getColumnDimension('F')->setWidth(6);
-        $sheet->getColumnDimension('G')->setWidth(14);
-        $sheet->getColumnDimension('H')->setWidth(30);
-
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(12);
+        $sheet->getColumnDimension('D')->setWidth(12);
+        $sheet->getColumnDimension('E')->setWidth(8);
+        $sheet->getColumnDimension('F')->setWidth(60);
+        $sheet->getColumnDimension('G')->setWidth(12);
+        $sheet->getColumnDimension('H')->setWidth(12);
+        $sheet->getColumnDimension('I')->setWidth(12);
 
         $writer = new XlsxWriter($book);
-        // return response($writer->save('php://output'), 200)
-        // ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        // ->header('Content-Disposition', 'inline; filename="実績一覧"');
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="実績一覧.xlsx"');
+        header('Content-Disposition: attachment; filename="models_' . date('md-Hi') . '.xlsx"');
         $writer->save('php://output');
     }
 }

@@ -17,7 +17,7 @@
         <div class="flex-center position-ref full-height">
             <div class="content">
                 <div class="title m-b-md">
-                    Laravel
+                    Modelsファイルアップロード
                 </div>
                 @include('include.message')
                 <div class="drop-zone" id="js-dropzone">
@@ -38,12 +38,12 @@
                     <p>直近5件</p>
                     <ul>
                     @foreach ($files as $item)
-                        <li>{{"[".$item->id."]".$item->filename."[".$item->updated_at.(($item->del_flg==0)?"送信(未完了)":"処理済み")."]"}}</li>
+                        <li>{{"[".$item->id."] ".$item->filename." [".$item->updated_at.(($item->del_flg==0)?" 送信(未完了)":" 処理済み")."]"}}</li>
                     @endforeach
                     </ul>
                 </div>
                 <div class="download">
-                    <a class="btn-download" href="{{route('file.download')}}">実績ファイルダウンロード</a>
+                    <a class="btn-download" href="{{route('file.download')}}">Modelsファイルダウンロード</a>
                 </div>
             </div>
         </div>

@@ -15,7 +15,8 @@ class ArModel extends Model
         'altitude',
         'url',
         'options',
-        'filename'
+        'filename',
+        'kinds'
     ];
 
     protected $casts = [
@@ -25,7 +26,8 @@ class ArModel extends Model
         'altitude' => 'float',
         'url' => 'string',
         'options' => 'string',
-        'filename' => 'string'
+        'filename' => 'string',
+        'kinds' => 'string'
     ];
 
     public static array $rules = [
@@ -37,7 +39,8 @@ class ArModel extends Model
         'altitude' => 'required|numeric',
         'url' => 'required|string',
         'options' => 'required|string',
-        'filename' => 'required|string|max:255'
+        'filename' => 'required|string|max:255',
+        'kinds' => 'required|string'
     ];
 
     
