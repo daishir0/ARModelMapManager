@@ -2,6 +2,8 @@
 
 AR Model Map Manager is a web application that centrally manages AR models and map information. With this application, you can upload, edit, delete, and download information about AR models, as well as display the location information of the models on a map.
 
+※日本語のREADMEは下部にあります。
+
 ## Features
 
 - Upload AR model information
